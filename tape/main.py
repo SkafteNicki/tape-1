@@ -201,6 +201,7 @@ def run_eval(args: typing.Optional[argparse.Namespace] = None) -> typing.Dict[st
     if args is None:
         base_parser = create_base_parser()
         parser = create_eval_parser(base_parser)
+        parser = create_model_parser(parser)
         args = parser.parse_args()
 
     if args.from_pretrained is None:
@@ -223,6 +224,7 @@ def run_embed(args: typing.Optional[argparse.Namespace] = None) -> None:
     if args is None:
         base_parser = create_base_parser()
         parser = create_embed_parser(base_parser)
+        parser = create_model_parser(parser)
         args = parser.parse_args()
     if args.from_pretrained is None:
         raise ValueError("Must specify pretrained model")
@@ -247,7 +249,8 @@ def run_train_distributed(args: typing.Optional[argparse.Namespace] = None) -> N
         base_parser = create_base_parser()
         distributed_parser = create_distributed_parser(base_parser)
         distributed_train_parser = create_train_parser(distributed_parser)
-        args = distributed_train_parser.parse_args()
+        parser = create_model_parser(parser)
+        args = parser.parse_args()
 
     # Define the experiment name here, instead of dealing with barriers and communication
     # when getting the experiment name
