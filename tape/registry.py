@@ -241,8 +241,8 @@ class Registry:
             if model_args:
                 model_args = convert_model_args(model_args)
                 for k,v in model_args.items():
-                    if k in config and type(config[k])==type(v):
-                        config[k] = v
+                    if k in config.__dict__ and type(config.__dict__[k])==type(v):
+                        setattr(config, k, v)
                     else:
                         raise ValueError(f"model arg {k} not in config or of the same type as default")
 
