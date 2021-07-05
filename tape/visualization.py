@@ -89,13 +89,13 @@ class WandBVisualizer(TAPEVisualizer):
     def __init__(self, log_dir: typing.Union[str, Path], exp_name: str, debug: bool = False):
         if not WANDB_FOUND:
             raise ImportError("wandb module not available")
-        if debug:
-            os.environ['WANDB_MODE'] = 'dryrun'
-        if 'WANDB_PROJECT' not in os.environ:
-            # Want the user to set the WANDB_PROJECT.
-            logger.warning("WANDB_PROJECT environment variable not found, "
-                           "not logging to app.wandb.ai")
-            os.environ['WANDB_MODE'] = 'dryrun'
+        #if debug:
+        #    os.environ['WANDB_MODE'] = 'dryrun'
+        #if 'WANDB_PROJECT' not in os.environ:
+        #    # Want the user to set the WANDB_PROJECT.
+        #    logger.warning("WANDB_PROJECT environment variable not found, "
+        #                   "not logging to app.wandb.ai")
+        #    os.environ['WANDB_MODE'] = 'dryrun'
         wandb.init(dir=log_dir, name=exp_name)
 
     def log_config(self, config: typing.Dict[str, typing.Any]) -> None:
