@@ -163,7 +163,7 @@ def create_distributed_parser(base_parser: argparse.ArgumentParser) -> argparse.
 
 def create_model_parser(base_parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(add_help=False, parents=[base_parser])
-    parser.add_argument('--model_args', nargs=argparse.REMAINDER)
+    parser.add_argument('--model_args', nargs=argparse.REMAINDER, default=None)
     return parser
 
 def run_train(args: typing.Optional[argparse.Namespace] = None, env=None) -> None:
