@@ -249,7 +249,7 @@ def run_train_distributed(args: typing.Optional[argparse.Namespace] = None) -> N
         base_parser = create_base_parser()
         distributed_parser = create_distributed_parser(base_parser)
         distributed_train_parser = create_train_parser(distributed_parser)
-        parser = create_model_parser(distributed_parser)
+        parser = create_model_parser(distributed_train_parser)
         args = parser.parse_args()
 
     # Define the experiment name here, instead of dealing with barriers and communication
