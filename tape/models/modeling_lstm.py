@@ -30,6 +30,7 @@ class ProteinLSTMConfig(ProteinConfig):
                  num_hidden_layers: int = 3,
                  hidden_dropout_prob: float = 0.1,
                  initializer_range: float = 0.02,
+                 temporal_pooling: str = 'attention',
                  **kwargs):
         super().__init__(**kwargs)
         self.vocab_size = vocab_size
@@ -38,6 +39,7 @@ class ProteinLSTMConfig(ProteinConfig):
         self.num_hidden_layers = num_hidden_layers
         self.hidden_dropout_prob = hidden_dropout_prob
         self.initializer_range = initializer_range
+        self.temporal_pooling = temporal_pooling
 
 
 class ProteinLSTMLayer(nn.Module):
@@ -59,10 +61,32 @@ class ProteinLSTMPooler(nn.Module):
         self.scalar_reweighting = nn.Linear(2 * config.num_hidden_layers, 1)
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = nn.Tanh()
+        self.temporal_pooling = config.temporal_pooling
+        self._la_w1 = nn.Conv1d(config.hidden_size, int(config.hidden_size/2), 5, padding=2)
+        self._la_w2 = nn.Conv1d(config.hidden_size, int(config.hidden_size/2), 5, padding=2)
+        self._la_mlp = nn.Linear(config.hidden_size, config.hidden_size)
 
     def forward(self, hidden_states):
         # We "pool" the model by simply taking the hidden state corresponding
         # to the first token.
+        if self.temporal_pooling == 'mean':
+            return hidden_states.mean(dim=1)
+        if self.temporal_pooling == 'max':
+            return hidden_states.max(dim=1)
+        if self.temporal_pooling == 'concat':
+            _temp = hidden_states.reshape(hidden_states.shape[0], -1)
+            return torch.nn.functional.pad(_temp, (0, 2048 - _temp.shape[1]))
+        if self.temporal_pooling == 'topmax':
+            val, _ = torch.topk(hidden_states, k=5, dim=1)
+            return val.mean(dim=1)
+        if self.temporal_pooling == 'light_attention':
+            _temp = hidden_states.permute(0,2,1)
+            a = self._la_w1(_temp).softmax(dim=-1)
+            v = self._la_w2(_temp)
+            v_max = v.max(dim=-1).values
+            v_sum = (a * v).sum(dim=-1)
+            return self._la_mlp(torch.cat([v_max, v_sum], dim=1))
+
         pooled_output = self.scalar_reweighting(hidden_states).squeeze(2)
         pooled_output = self.dense(pooled_output)
         pooled_output = self.activation(pooled_output)
