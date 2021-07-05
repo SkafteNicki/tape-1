@@ -93,6 +93,7 @@ class ProteinBertConfig(ProteinConfig):
                  type_vocab_size: int = 2,
                  initializer_range: float = 0.02,
                  layer_norm_eps: float = 1e-12,
+                 temporal_pooling: str = 'attention',
                  **kwargs):
         super().__init__(**kwargs)
         self.vocab_size = vocab_size
@@ -107,6 +108,7 @@ class ProteinBertConfig(ProteinConfig):
         self.type_vocab_size = type_vocab_size
         self.initializer_range = initializer_range
         self.layer_norm_eps = layer_norm_eps
+        self.temporal_pooling = temporal_pooling
 
 
 class ProteinBertEmbeddings(nn.Module):
@@ -366,11 +368,34 @@ class ProteinBertPooler(nn.Module):
         super().__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = nn.Tanh()
+        self.temporal_pooling = config.temporal_pooling
+        self._la_w1 = nn.Conv1d(config.hidden_size, 3)
+        self._la_w2 = nn.Conv1d(config.hidden_size, 3)
+        self._la_mlp = nn.Linear(config.hidden_size, config.hidden_size)
 
     def forward(self, hidden_states):
         # We "pool" the model by simply taking the hidden state corresponding
         # to the first token.
         first_token_tensor = hidden_states[:, 0]
+        import pdb
+        pdb.set_trace()
+        if self.temporal_pooling == 'mean':
+            return hidden_states.mean(dim=-1)
+        if self.temporal_pooling == 'max':
+            return hidden_states.max(dim=-1)
+        if self.temporal_pooling == 'concat':
+            _temp = hidden_states.reshape(hidden_states.shape[0], -1)
+            return torch.nn.functional.pad(_temp, (0, 2048 - _temp.shape[1]))
+        if self.temporal_pooling == 'topmax':
+            val, _ = torch.topk(hidden_states, k=5, dim=-1)
+            return val.mean(dim=-1)
+        if self.temporal_pooling == 'light_attention':
+            a = self._la_w1(hidden_states).softmax(dim=-1)
+            v = self._la_w2(hidden_states)
+            v_max = v.max(dim=-1)
+            v_sum = (a * v).sum(dim=-1)
+            return self._la_mlp(torch.cat(v_max, v_sum))
+
         pooled_output = self.dense(first_token_tensor)
         pooled_output = self.activation(pooled_output)
         return pooled_output
