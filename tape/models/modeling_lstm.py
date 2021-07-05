@@ -31,6 +31,7 @@ class ProteinLSTMConfig(ProteinConfig):
                  hidden_dropout_prob: float = 0.1,
                  initializer_range: float = 0.02,
                  temporal_pooling: str = 'attention',
+                 freeze_embedding: bool = False,
                  **kwargs):
         super().__init__(**kwargs)
         self.vocab_size = vocab_size
@@ -40,6 +41,7 @@ class ProteinLSTMConfig(ProteinConfig):
         self.hidden_dropout_prob = hidden_dropout_prob
         self.initializer_range = initializer_range
         self.temporal_pooling = temporal_pooling
+        self.freeze_embedding = freeze_embedding
 
 
 class ProteinLSTMLayer(nn.Module):
@@ -239,10 +241,12 @@ class ProteinLSTMForValuePrediction(ProteinLSTMAbstractModel):
 
         self.lstm = ProteinLSTMModel(config)
         self.predict = ValuePredictionHead(config.hidden_size)
-
+        self.freeze_embedding = config.freeze_embedding
         self.init_weights()
 
     def forward(self, input_ids, input_mask=None, targets=None):
+        if self.freeze_embedding:
+            self.lstm.train(False)
 
         outputs = self.lstm(input_ids, input_mask=input_mask)
 
@@ -261,10 +265,12 @@ class ProteinLSTMForSequenceClassification(ProteinLSTMAbstractModel):
         self.lstm = ProteinLSTMModel(config)
         self.classify = SequenceClassificationHead(
             config.hidden_size, config.num_labels)
-
+        self.freeze_embedding = config.freeze_embedding
         self.init_weights()
 
     def forward(self, input_ids, input_mask=None, targets=None):
+        if self.freeze_embedding:
+            self.lstm.train(False)
 
         outputs = self.lstm(input_ids, input_mask=input_mask)
 

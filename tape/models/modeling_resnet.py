@@ -32,6 +32,7 @@ class ProteinResNetConfig(ProteinConfig):
                  initializer_range: float = 0.02,
                  layer_norm_eps: float = 1e-12,
                  temporal_pooling: str = 'attention',
+                 freeze_embedding: bool = False,
                  **kwargs):
         super().__init__(**kwargs)
         self.vocab_size = vocab_size
@@ -42,6 +43,7 @@ class ProteinResNetConfig(ProteinConfig):
         self.initializer_range = initializer_range
         self.layer_norm_eps = layer_norm_eps
         self.temporal_pooling = temporal_pooling
+        self.freeze_embedding = freeze_embedding
 
 
 class MaskedConv1d(nn.Conv1d):
@@ -301,10 +303,12 @@ class ProteinResNetForValuePrediction(ProteinResNetAbstractModel):
 
         self.resnet = ProteinResNetModel(config)
         self.predict = ValuePredictionHead(config.hidden_size)
-
+        self.freeze_embedding = config.freeze_embedding
         self.init_weights()
 
     def forward(self, input_ids, input_mask=None, targets=None):
+        if self.freeze_embedding:
+            self.resnet.train(False)
 
         outputs = self.resnet(input_ids, input_mask=input_mask)
 
@@ -322,10 +326,13 @@ class ProteinResNetForSequenceClassification(ProteinResNetAbstractModel):
 
         self.resnet = ProteinResNetModel(config)
         self.classify = SequenceClassificationHead(config.hidden_size, config.num_labels)
+        self.freeze_embedding = config.freeze_embedding
 
         self.init_weights()
 
     def forward(self, input_ids, input_mask=None, targets=None):
+        if self.freeze_embedding:
+            self.resnet.train(False)
 
         outputs = self.resnet(input_ids, input_mask=input_mask)
 

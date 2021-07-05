@@ -94,6 +94,7 @@ class ProteinBertConfig(ProteinConfig):
                  initializer_range: float = 0.02,
                  layer_norm_eps: float = 1e-12,
                  temporal_pooling: str = 'attention',
+                 freeze_embedding: bool = False,
                  **kwargs):
         super().__init__(**kwargs)
         self.vocab_size = vocab_size
@@ -109,6 +110,7 @@ class ProteinBertConfig(ProteinConfig):
         self.initializer_range = initializer_range
         self.layer_norm_eps = layer_norm_eps
         self.temporal_pooling = temporal_pooling
+        self.freeze_embedding = freeze_embedding
 
 
 class ProteinBertEmbeddings(nn.Module):
@@ -523,11 +525,12 @@ class ProteinBertForValuePrediction(ProteinBertAbstractModel):
 
         self.bert = ProteinBertModel(config)
         self.predict = ValuePredictionHead(config.hidden_size)
-
+        self.freeze_embedding = config.freeze_embedding
         self.init_weights()
 
     def forward(self, input_ids, input_mask=None, targets=None):
-
+        if self.freeze_embedding:
+            self.bert.train(False)
         outputs = self.bert(input_ids, input_mask=input_mask)
 
         sequence_output, pooled_output = outputs[:2]
@@ -545,11 +548,12 @@ class ProteinBertForSequenceClassification(ProteinBertAbstractModel):
         self.bert = ProteinBertModel(config)
         self.classify = SequenceClassificationHead(
             config.hidden_size, config.num_labels)
-
+        self.freeze_embedding = config.freeze_embedding
         self.init_weights()
 
     def forward(self, input_ids, input_mask=None, targets=None):
-
+        if self.freeze_embedding:
+            self.bert.train(False)
         outputs = self.bert(input_ids, input_mask=input_mask)
 
         sequence_output, pooled_output = outputs[:2]
