@@ -6,6 +6,21 @@ from pathlib import Path
 PathType = Union[str, Path]
 
 
+def convert_model_args(model_args):
+    d = {}
+    for e in model_args:
+        k, v = e.split("=")
+        try:
+            v = int(v)
+        except:
+            try:
+                v = float(v)
+            except:
+                v = str(v)
+        d[k] = v
+    return d
+
+
 class TAPETaskSpec:
     """
     Attributes
@@ -222,9 +237,14 @@ class Registry:
                 config = config_class.from_json_file(config_file)
             else:
                 config = config_class()
+            
             if model_args:
-                import pdb
-                pdb.set_trace()
+                model_args = convert_model_args(model_args)
+                for k,v in model_args.items():
+                    if k in config and type(config[k])==type(v):
+                        config[k] = v
+                    else:
+                        raise ValueError(f"model arg {k} not in config or of the same type as default")
 
             config.num_labels = task_spec.num_labels
             model = model_cls(config)
