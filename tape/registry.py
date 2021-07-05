@@ -198,7 +198,8 @@ class Registry:
                        model_name: str,
                        task_name: str,
                        config_file: Optional[PathType] = None,
-                       load_dir: Optional[PathType] = None) -> ProteinModel:
+                       load_dir: Optional[PathType] = None,
+                       model_args = None) -> ProteinModel:
         """ Create a TAPE task model, either from scratch or from a pretrained model.
             This is mostly a helper function that evaluates the if statements in a
             sensible order if you pass all three of the arguments.
@@ -221,6 +222,10 @@ class Registry:
                 config = config_class.from_json_file(config_file)
             else:
                 config = config_class()
+            if model_args:
+                import pdb
+                pdb.set_trace()
+
             config.num_labels = task_spec.num_labels
             model = model_cls(config)
         return model

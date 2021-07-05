@@ -410,7 +410,8 @@ def run_train(model_type: str,
               debug: bool = False,
               log_level: typing.Union[str, int] = logging.INFO,
               patience: int = -1,
-              resume_from_checkpoint: bool = False) -> None:
+              resume_from_checkpoint: bool = False,
+              model_args = None) -> None:
 
     # SETUP AND LOGGING CODE #
     input_args = locals()
@@ -442,7 +443,7 @@ def run_train(model_type: str,
     num_train_optimization_steps = utils.get_num_train_optimization_steps(
         train_dataset, batch_size, num_train_epochs)
 
-    model = registry.get_task_model(model_type, task, model_config_file, from_pretrained)
+    model = registry.get_task_model(model_type, task, model_config_file, from_pretrained, model_args)
     model = model.to(device)
     optimizer = utils.setup_optimizer(model, learning_rate)
     viz = visualization.get(log_dir, exp_dir, local_rank, debug=debug)

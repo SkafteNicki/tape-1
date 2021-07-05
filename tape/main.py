@@ -161,6 +161,11 @@ def create_distributed_parser(base_parser: argparse.ArgumentParser) -> argparse.
     return parser
 
 
+def create_model_parser(base_parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(add_help=False, parents=[base_parser])
+    parser.add_argument('--model_args', nargs=argparse.REMAINDER)
+    return parser
+
 def run_train(args: typing.Optional[argparse.Namespace] = None, env=None) -> None:
     if env is not None:
         os.environ = env
@@ -168,7 +173,8 @@ def run_train(args: typing.Optional[argparse.Namespace] = None, env=None) -> Non
     if args is None:
         base_parser = create_base_parser()
         train_parser = create_train_parser(base_parser)
-        args = train_parser.parse_args()
+        model_parser = create_model_parser(train_parser)
+        args = model_parser.parse_args()
 
     if args.gradient_accumulation_steps < 1:
         raise ValueError(
