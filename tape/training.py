@@ -267,7 +267,7 @@ def run_train_epoch(epoch_id: int,
                     viz: typing.Optional[visualization.TAPEVisualizer] = None,
                     num_log_iter: int = 20,
                     gradient_accumulation_steps: int = 1,
-                    steps_per_epoch: int = -1) -> LossAndMetrics:
+                    num_steps_per_epoch: int = -1) -> LossAndMetrics:
     if viz is None:
         viz = visualization.DummyVisualizer()
     smoothing = 1 - 1 / num_log_iter
@@ -307,7 +307,7 @@ def run_train_epoch(epoch_id: int,
                 end_t = timer()
                 logger.info(make_log_str(step, end_t - start_t))
                 start_t = end_t
-        if (step + 1) > steps_per_epoch:
+        if num_steps_per_epoch != -1 and (step + 1) > num_steps_per_epoch:
             break
 
     final_print_str = f"Train: [Loss: {accumulator.final_loss():.5g}]"
@@ -415,7 +415,7 @@ def run_train(model_type: str,
               patience: int = -1,
               resume_from_checkpoint: bool = False,
               model_args = None,
-              steps_per_epoch: int = -1) -> None:
+              num_steps_per_epoch: int = -1) -> None:
 
     # SETUP AND LOGGING CODE #
     input_args = locals()
@@ -510,7 +510,7 @@ def run_train(model_type: str,
     with utils.wrap_cuda_oom_error(local_rank, batch_size, n_gpu, gradient_accumulation_steps):
         for epoch_id in range(start_epoch, num_train_epochs):
             run_train_epoch(epoch_id, train_loader, runner,
-                            viz, num_log_iter, gradient_accumulation_steps, steps_per_epoch)
+                            viz, num_log_iter, gradient_accumulation_steps, num_steps_per_epoch)
             if eval_freq > 0 and (epoch_id + 1) % eval_freq == 0:
                 val_loss, _ = run_valid_epoch(epoch_id, valid_loader, runner, viz, is_master)
                 if val_loss < best_val_loss:
