@@ -330,7 +330,7 @@ def run_valid_epoch(epoch_id: int,
     torch.set_grad_enabled(False)
     runner.eval()
 
-    for idx, batch in enumerate(tqdm(valid_loader, desc='Running Eval', total=num_batches,
+    for idx, batch in enumerate(tqdm(valid_loader, desc='Running Eval', total=num_batches_to_run,
                                 disable=not is_master, leave=False)):
         loss, metrics = runner.forward(batch)  # type: ignore
         accumulator.update(loss, metrics)
