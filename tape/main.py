@@ -65,6 +65,8 @@ def create_train_parser(base_parser: argparse.ArgumentParser) -> argparse.Argume
                         help='Directory from which to load task data')
     parser.add_argument('--num_train_epochs', default=10, type=int,
                         help='Number of training epochs')
+    parser.add_argument('--num_steps_per_epoch', default=-1, type=int,
+                        help='Number of steps per epoch')
     parser.add_argument('--num_log_iter', default=20, type=int,
                         help='Number of training steps per log iteration')
     parser.add_argument('--fp16', action='store_true', help='Whether to use fp16 weights')
@@ -84,7 +86,7 @@ def create_train_parser(base_parser: argparse.ArgumentParser) -> argparse.Argume
     parser.add_argument('--eval_freq', type=int, default=1,
                         help="Frequency of eval pass. A value <= 0 means the eval pass is "
                              "not run")
-    parser.add_argument('--save_freq', default=1, type=utils.int_or_str,
+    parser.add_argument('--save_freq', default='improvement', type=utils.int_or_str,
                         help="How often to save the model during training. Either an integer "
                              "frequency or the string 'improvement'")
     parser.add_argument('--patience', default=-1, type=int,
