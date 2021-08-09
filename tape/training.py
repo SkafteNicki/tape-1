@@ -321,17 +321,21 @@ def run_valid_epoch(epoch_id: int,
                     valid_loader: DataLoader,
                     runner: ForwardRunner,
                     viz: typing.Optional[visualization.TAPEVisualizer] = None,
-                    is_master: bool = True) -> typing.Tuple[float, typing.Dict[str, float]]:
+                    is_master: bool = True,
+                    val_check_frac: float = 1.0) -> typing.Tuple[float, typing.Dict[str, float]]:
     num_batches = len(valid_loader)
+    num_batches_to_run = int(num_batches * val_check_frac)
     accumulator = utils.MetricsAccumulator()
 
     torch.set_grad_enabled(False)
     runner.eval()
 
-    for batch in tqdm(valid_loader, desc='Running Eval', total=num_batches,
-                      disable=not is_master, leave=False):
+    for idx, batch in enumerate(tqdm(valid_loader, desc='Running Eval', total=num_batches,
+                                disable=not is_master, leave=False)):
         loss, metrics = runner.forward(batch)  # type: ignore
         accumulator.update(loss, metrics)
+        if idx>num_batches_to_run:
+            break
 
     # Reduce loss across all processes if multiprocessing
     eval_loss = utils.reduce_scalar(accumulator.final_loss())
@@ -415,7 +419,8 @@ def run_train(model_type: str,
               patience: int = -1,
               resume_from_checkpoint: bool = False,
               model_args = None,
-              steps_per_epoch: int = -1) -> None:
+              steps_per_epoch: int = -1,
+              val_check_frac: float = 1.0) -> None:
 
     # SETUP AND LOGGING CODE #
     input_args = locals()
@@ -512,7 +517,7 @@ def run_train(model_type: str,
             run_train_epoch(epoch_id, train_loader, runner,
                             viz, num_log_iter, gradient_accumulation_steps, steps_per_epoch)
             if eval_freq > 0 and (epoch_id + 1) % eval_freq == 0:
-                val_loss, _ = run_valid_epoch(epoch_id, valid_loader, runner, viz, is_master)
+                val_loss, _ = run_valid_epoch(epoch_id, valid_loader, runner, viz, is_master, val_check_frac)
                 if val_loss < best_val_loss:
                     best_val_loss = val_loss
                     num_evals_no_improvement = 0
