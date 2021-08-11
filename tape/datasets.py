@@ -371,6 +371,28 @@ class MaskedLanguageModelingDataset(Dataset):
         return masked_tokens, labels
 
 
+@registry.register_task('beta_lactamase')
+class BetaModelingDataset(MaskedLanguageModelingDataset):
+
+    def __init__(self,
+                 data_path: Union[str, Path],
+                 split: str,
+                 tokenizer: Union[str, TAPETokenizer] = 'iupac',
+                 in_memory: bool = False):
+        super().__init__()
+        if split not in ('train', 'valid', 'holdout'):
+            raise ValueError(
+                f"Unrecognized split: {split}. "
+                f"Must be one of ['train', 'valid', 'holdout']")
+        if isinstance(tokenizer, str):
+            tokenizer = TAPETokenizer(vocab=tokenizer)
+        self.tokenizer = tokenizer
+
+        data_path = Path(data_path)
+        data_file = f'beta/PF00144_full_length_sequences_labeled.fasta'
+        self.data = dataset_factory(data_path / data_file, in_memory)    
+
+
 @registry.register_task('language_modeling')
 class LanguageModelingDataset(Dataset):
     """Creates the Language Modeling Pfam Dataset

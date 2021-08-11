@@ -771,7 +771,7 @@ class MLMHead(nn.Module):
         if targets is not None:
             loss_fct = nn.CrossEntropyLoss(ignore_index=self._ignore_index)
             masked_lm_loss = loss_fct(
-                hidden_states.view(-1, self.vocab_size), targets.view(-1))
+                hidden_states.reshape(-1, self.vocab_size), targets.reshape(-1))
             metrics = {'perplexity': torch.exp(masked_lm_loss)}
             loss_and_metrics = (masked_lm_loss, metrics)
             outputs = (loss_and_metrics,) + outputs
