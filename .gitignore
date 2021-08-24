@@ -1,4 +1,11 @@
-data/
+data/fluorescence
+data/pfam
+data/proteinnet
+data/remote_homology
+data/secondary_structure
+data/stability
+data/unilanguage/*.fasta
+data/pfam.*
 logs/
 results/
 pretrained_models/
@@ -116,5 +123,4 @@ venv.bak/
 *.npy
 *.pkl
 *.npz
-*.fasta
 *.lmdb
