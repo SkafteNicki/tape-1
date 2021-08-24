@@ -92,7 +92,7 @@ class ProteinBottleneckModel(BottleneckAbstractModel):
         outputs = (sequence_output, embeddings) + output[2:]
         return outputs
 
-
+@registry.register_task_model('beta_lactamase', 'bottleneck')
 @registry.register_task_model('masked_language_modeling', 'bottleneck')
 @registry.register_task_model('language_modeling', 'bottleneck')
 class ProteinBottleneckForPretraining(BottleneckAbstractModel):

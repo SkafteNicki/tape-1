@@ -2,6 +2,7 @@ import typing
 import logging
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from .modeling_utils import ProteinConfig
 from .modeling_utils import ProteinModel
@@ -133,31 +134,34 @@ class ResNetEncoder(nn.Module):
 
     def __init__(self, config):
         super().__init__()
+        self.config = config
         self.output_hidden_states = config.output_hidden_states
         self.encoder = nn.ModuleList(
             [ProteinResNetBlock(config) for _ in range(config.num_hidden_layers)])
 
-        self.decoder = nn.ModuleList(nn.ModuleList(
+        self.decoder = nn.ModuleList(
             [ProteinResNetBlock(config) for _ in range(config.num_hidden_layers)])
 
-        self.bottleneck1 = nn.Linear(94*config.hidden_size, config.latent_dim)
-        self.bootleneck2 = nn.Linear(config.latent_dim, 94*config.hidden_size)
+        self.bottleneck1 = nn.Linear(93*config.hidden_size, config.latent_size)
+        self.bottleneck2 = nn.Linear(config.latent_size, 94*config.hidden_size)
 
     def forward(self, hidden_states, input_mask=None):
-        all_hidden_states = ()
         for i, layer_module in enumerate(self.encoder):
-            hidden_states = layer_module(hidden_states, input_mask)
-            if i!=0 and i % 5 == 0:
+            hidden_states = layer_module(hidden_states)
+            if i != 0 and i % 5 == 0:
                 hidden_states = nn.functional.avg_pool1d(hidden_states, 2, stride=2)
 
-        latents = self.bottleneck1(hidden_states)
-        hidden_states = self.bottleneck2(latents)
-        
-        for i, layer_module in enumerate(self.decoder):
-            if i % 5 == 0:
-                hidden_states = nn.functional.upsample(hidden_states, 2)
-            hidden_states = layer_module(hidden_states, input_mask)
+        bs = hidden_states.shape[0]
+        latents = self.bottleneck1(hidden_states.reshape(bs, -1))
+        hidden_states = self.bottleneck2(latents).reshape(bs, -1, 94)
 
+
+        for i, layer_module in enumerate(self.decoder):
+            if i != 0 and i % 5 == 0:
+                hidden_states = nn.functional.interpolate(hidden_states, scale_factor=2)
+            hidden_states = layer_module(hidden_states)
+
+        hidden_states = hidden_states[:,:,:self.config.max_size]
         outputs = (hidden_states, latents)
 
         return outputs
@@ -187,7 +191,7 @@ class ProteinAEAbstractModel(ProteinModel):
                 module.bias.data.zero_()
 
 
-@registry.register_task_model('embed', 'resnet')
+@registry.register_task_model('embed', 'autoencoder')
 class ProteinResNetModel(ProteinAEAbstractModel):
 
     def __init__(self, config):
@@ -201,6 +205,17 @@ class ProteinResNetModel(ProteinAEAbstractModel):
     def forward(self,
                 input_ids,
                 input_mask=None):
+        pre_pad_shape = input_ids.shape[1]
+        if pre_pad_shape >= self.config.max_size:
+            input_ids = input_ids[:,:self.config.max_size]
+            if not input_mask is None:
+                input_mask = input_mask[:,:self.config.max_size]
+        else:
+            input_ids = F.pad(input_ids, (0, self.config.max_size - pre_pad_shape))
+            if not input_mask is None:
+                input_mask = F.pad(input_mask, (0, self.config.max_size - pre_pad_shape))
+        assert input_ids.shape[1] == self.config.max_size
+        
         if input_mask is not None and torch.any(input_mask != 1):
             extended_input_mask = input_mask.unsqueeze(2)
             # fp16 compatibility
@@ -213,26 +228,21 @@ class ProteinResNetModel(ProteinAEAbstractModel):
         embedding_output = embedding_output.transpose(1, 2)
         if extended_input_mask is not None:
             extended_input_mask = extended_input_mask.transpose(1, 2)
-        encoder_outputs = self.encoder(embedding_output, extended_input_mask)
-        sequence_output = encoder_outputs[0]
+        sequence_output, pooled_output = self.encoder(embedding_output, extended_input_mask)
         sequence_output = sequence_output.transpose(1, 2).contiguous()
-        # sequence_output = encoder_outputs[0]
-        if extended_input_mask is not None:
-            extended_input_mask = extended_input_mask.transpose(1, 2)
-        pooled_output = self.pooler(sequence_output, extended_input_mask)
+        return sequence_output, pooled_output
 
-        # add hidden_states and attentions if they are here
-        outputs = (sequence_output, pooled_output,) + encoder_outputs[1:]
-        return outputs  # sequence_output, pooled_output, (hidden_states)
-
-
-@registry.register_task_model('masked_language_modeling', 'resnet')
+@registry.register_task_model('beta_lactamase', 'autoencoder')
+@registry.register_task_model('language_modeling', 'autoencoder')
 class ProteinResNetForMaskedLM(ProteinAEAbstractModel):
 
     def __init__(self, config):
         super().__init__(config)
 
         self.resnet = ProteinResNetModel(config)
+        self.mlm = MLMHead(
+            config.hidden_size, config.vocab_size, config.hidden_act, config.layer_norm_eps,
+            ignore_index=-1)
  
         self.init_weights()
         self.tie_weights()
@@ -249,28 +259,17 @@ class ProteinResNetForMaskedLM(ProteinAEAbstractModel):
                 input_mask=None,
                 targets=None):
         pre_pad_shape = input_ids.shape[1]
-        if pre_pad_shape >= self.config.max_size:
-            input_ids = input_ids[:,:self.config.max_size]
-            if not input_mask is None:
-                input_mask = input_mask[:,:self.config.max_size]
-        else:
-            input_ids = F.pad(input_ids, (0, self.config.max_size - pre_pad_shape))
-            if not input_mask is None:
-                input_mask = F.pad(input_mask, (0, self.config.max_size - pre_pad_shape))
-        assert input_ids.shape[1] == self.config.max_size
-
-        outputs = self.resnet(input_ids, input_mask=input_mask)
-        loss = nn.functional.cross_entropy(
-            outputs[0].reshape(-1, self.vocab_size), 
-            targets.reshape(-1), 
-            ignore_index=-1
-        )
+        if targets is not None:
+            targets = targets[:,:self.config.max_size]
+        
+        outputs = self.resnet(input_ids, input_mask=input_mask)      
+        outputs = self.mlm(outputs[0][:,:pre_pad_shape,:], targets) + outputs[2:]
         # (loss), prediction_scores, (hidden_states), (attentions)
-        return loss, outputs[0], outputs[1]
+        return outputs
 
 
-@registry.register_task_model('fluorescence', 'resnet')
-@registry.register_task_model('stability', 'resnet')
+@registry.register_task_model('fluorescence', 'autoencoder')
+@registry.register_task_model('stability', 'autoencoder')
 class ProteinResNetForValuePrediction(ProteinAEAbstractModel):
 
     def __init__(self, config):
@@ -293,7 +292,7 @@ class ProteinResNetForValuePrediction(ProteinAEAbstractModel):
         return outputs
 
 
-@registry.register_task_model('remote_homology', 'resnet')
+@registry.register_task_model('remote_homology', 'autoencoder')
 class ProteinResNetForSequenceClassification(ProteinAEAbstractModel):
 
     def __init__(self, config):

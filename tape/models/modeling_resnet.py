@@ -146,6 +146,10 @@ class ProteinResNetPooler(nn.Module):
         if self.temporal_pooling == 'concat':
             _temp = hidden_states.reshape(hidden_states.shape[0], -1)
             return torch.nn.functional.pad(_temp, (0, 2048 - _temp.shape[1]))
+        if self.temporal_pooling == 'meanmax':
+            _mean = hidden_states.mean(dim=1)
+            _max = hidden_states.max(dim=1)
+            return torch.cat([_mean, _max])
         if self.temporal_pooling == 'topmax':
             val, _ = torch.topk(hidden_states, k=5, dim=1)
             return val.mean(dim=1)

@@ -379,18 +379,76 @@ class BetaModelingDataset(MaskedLanguageModelingDataset):
                  split: str,
                  tokenizer: Union[str, TAPETokenizer] = 'iupac',
                  in_memory: bool = False):
-        super().__init__()
-        if split not in ('train', 'valid', 'holdout'):
-            raise ValueError(
-                f"Unrecognized split: {split}. "
-                f"Must be one of ['train', 'valid', 'holdout']")
-        if isinstance(tokenizer, str):
-            tokenizer = TAPETokenizer(vocab=tokenizer)
-        self.tokenizer = tokenizer
-
+        super().__init__(data_path, split, tokenizer, in_memory)
         data_path = Path(data_path)
-        data_file = f'beta/PF00144_full_length_sequences_labeled.fasta'
+        data_file = f'unilanguage/{split}_combined.fasta'
+        self.data = dataset_factory(data_path / data_file, in_memory)
+
+    def collate_fn(self, batch: List[Any]) -> Dict[str, torch.Tensor]:
+        input_ids, input_mask, lm_label_ids = tuple(zip(*batch))
+
+        input_ids = torch.from_numpy(pad_sequences(input_ids, 0))
+        input_mask = torch.from_numpy(pad_sequences(input_mask, 0))
+        # ignore_index is -1
+        lm_label_ids = torch.from_numpy(pad_sequences(lm_label_ids, -1))
+
+        return {'input_ids': input_ids,
+                'input_mask': input_mask,
+                'targets': lm_label_ids}
+
+    def __getitem__(self, index):
+        item = self.data[index]
+        tokens = self.tokenizer.tokenize(item['primary'])
+        tokens = self.tokenizer.add_special_tokens(tokens)
+        masked_tokens, labels = self._apply_bert_mask(tokens)
+        masked_token_ids = np.array(
+            self.tokenizer.convert_tokens_to_ids(masked_tokens), np.int64)
+        input_mask = np.ones_like(masked_token_ids)
+
+        masked_token_ids = np.array(
+            self.tokenizer.convert_tokens_to_ids(masked_tokens), np.int64)
+
+        return masked_token_ids, input_mask, labels
+
+
+@registry.register_task('unilanguage')
+class UniModelingDataset(MaskedLanguageModelingDataset):
+
+    def __init__(self,
+                 data_path: Union[str, Path],
+                 split: str,
+                 tokenizer: Union[str, TAPETokenizer] = 'iupac',
+                 in_memory: bool = False):
+        super().__init__(data_path, split, tokenizer, in_memory)
+        data_path = Path(data_path)
+        data_file = f'unilanguage/PF00144_full_length_sequences_labeled.fasta'
         self.data = dataset_factory(data_path / data_file, in_memory)    
+
+    def collate_fn(self, batch: List[Any]) -> Dict[str, torch.Tensor]:
+        input_ids, input_mask, lm_label_ids = tuple(zip(*batch))
+
+        input_ids = torch.from_numpy(pad_sequences(input_ids, 0))
+        input_mask = torch.from_numpy(pad_sequences(input_mask, 0))
+        # ignore_index is -1
+        lm_label_ids = torch.from_numpy(pad_sequences(lm_label_ids, -1))
+
+        return {'input_ids': input_ids,
+                'input_mask': input_mask,
+                'targets': lm_label_ids}
+
+    def __getitem__(self, index):
+        item = self.data[index]
+        tokens = self.tokenizer.tokenize(item['primary'])
+        tokens = self.tokenizer.add_special_tokens(tokens)
+        masked_tokens, labels = self._apply_bert_mask(tokens)
+        masked_token_ids = np.array(
+            self.tokenizer.convert_tokens_to_ids(masked_tokens), np.int64)
+        input_mask = np.ones_like(masked_token_ids)
+
+        masked_token_ids = np.array(
+            self.tokenizer.convert_tokens_to_ids(masked_tokens), np.int64)
+
+        return masked_token_ids, input_mask, labels
 
 
 @registry.register_task('language_modeling')
